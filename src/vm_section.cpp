@@ -94,7 +94,7 @@ void VMSection::addVmHandler(VMHandler vmHandler)
 {
 	vmHandler.setFileOffset(writePointer + pointerToRawData);
 	vmHandler.setRva(fileOffsetToRva(writePointer + pointerToRawData, virtualAddress, pointerToRawData));
-	// vmHandler.mutate();
+	vmHandler.mutate();
 	VM::vmHandlers.push_back(vmHandler);
 	addBytes(vmHandler.getBytes());
 }

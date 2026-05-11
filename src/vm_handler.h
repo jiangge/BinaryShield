@@ -33,10 +33,11 @@ value between rsp & r15 to determine where we will base our vmctx relocation.
 	0x48, 0x89, 0xFC,                                 /* mov rsp, rdi */ \
                                                       /* NO_COLLISION: */
 
-#define JMP_TO_NEXT_HANDLER \
-    0x41, 0x8B, 0x45, 0x00,   /* mov eax, dword ptr [r13] */ \
-    0x49, 0x83, 0xC5, 0x04,   /* add r13, 0x04 */ \
-    0x4C, 0x01, 0xF0,         /* add rax, r14 */ \
+#define JMP_TO_NEXT_HANDLER_WITH_DECRYPT_WITH_DECRYPT \
+    0x41, 0x8B, 0x45, 0x00,   /* mov eax, dword ptr [r13] : load encrypted handler RVA */ \
+    0x49, 0x83, 0xC5, 0x04,   /* add r13, 0x04 : advance IP */ \
+    0x35, 0x9E, 0x37, 0x79, 0xB9,  /* xor eax, 0xB979379E : decrypt with per-build key */ \
+    0x4C, 0x01, 0xF0,         /* add rax, r14 : add module base */ \
     0xFF, 0xE0,               /* jmp rax */
 
 enum VMHandlerTypes
@@ -76,6 +77,9 @@ enum VMHandlerTypes
 	JMP,
 
 	JNE,
+
+	ANTIDBG,
+	ENCRYPT_DECRYPT,
 };
 
 class VMHandler
@@ -88,6 +92,7 @@ public:
 
 	void setRva(DWORD rva);
 	void setFileOffset(DWORD fileOffset);
+	void mutate();
 protected:
 	VMHandlerTypes type;
 	DWORD rva;
@@ -126,7 +131,7 @@ public:
 			0x4C, 0x89, 0xB4, 0x24, 0x88, 0x00, 0x00, 0x00,      // mov qword ptr [rsp+0x88], r14
 			0x45, 0x8B, 0xAF, 0x80, 0x0, 0x0, 0x0,               // mov r13d, dword ptr [r15+0x80]
 			0x4D, 0x01, 0xF5,                                    // add r13, r14
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	};
 private:
@@ -179,7 +184,7 @@ public:
 			0x48, 0x8B, 0x04, 0xC4,               // mov rax, qword ptr [rsp+rax*0x08]
 			0x49, 0x83, 0xEF, 0x08,               // sub r15, 0x08
 			0x49, 0x89, 0x07,                     // mov qword ptr [r15], rax
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -198,7 +203,7 @@ public:
 			0x8B, 0x04, 0xC4,                    // mov eax, dword ptr [rsp+rax*0x08]
 			0x49, 0x83, 0xEF, 0x04,               // sub r15, 0x04
 			0x41, 0x89, 0x07,                     // mov dword ptr [r15], eax
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -217,7 +222,7 @@ public:
 			0x66, 0x8B, 0x04, 0xC4,               // mov ax, word ptr [rsp+rax*0x08]
 			0x49, 0x83, 0xEF, 0x02,               // sub r15, 0x02
 			0x66, 0x41, 0x89, 0x07,               // mov word ptr [r15], ax
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -236,7 +241,7 @@ public:
 			0x8A, 0x04, 0xC4,                     // mov al, byte ptr [rsp+rax*0x08]
 			0x49, 0x83, 0xEF, 0x01,               // sub r15, 0x01
 			0x41, 0x88, 0x07,                     // mov byte ptr [r15], al
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -253,7 +258,7 @@ public:
 			0x4C, 0x89, 0xF8,         // mov rax, r15
 			0x49, 0x83, 0xEF, 0x08,   // sub r15, 0x08
 			0x49, 0x89, 0x07,         // mov qword ptr [r15], rax
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -269,7 +274,7 @@ public:
 			0x44, 0x89, 0xF8,         // mov eax, r15d
 			0x49, 0x83, 0xEF, 0x04,   // sub r15, 0x04
 			0x41, 0x89, 0x07,         // mov dword ptr [r15], eax
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -285,7 +290,7 @@ public:
 			0x66, 0x44, 0x89, 0xF8,   // mov ax, r15w
 			0x49, 0x83, 0xEF, 0x02,   // sub r15, 0x02
 			0x66, 0x41, 0x89, 0x07,   // mov word ptr [r15], ax
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -301,7 +306,7 @@ public:
 			0x44, 0x88, 0xF8,         // mov al, r15b
 			0x49, 0x83, 0xEF, 0x01,   // sub r15, 0x01
 			0x41, 0x88, 0x07,         // mov byte ptr [r15], al
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -316,7 +321,7 @@ public:
 		{
 			0x4D, 0x8B, 0x3F,   // mov r15, qword ptr [r15]
 			CONTEXT_COLLISION_CHECK
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -330,7 +335,7 @@ public:
 		{
 			0x45, 0x8B, 0x3F,   // mov r15d, dword ptr [r15]
 			CONTEXT_COLLISION_CHECK
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -344,7 +349,7 @@ public:
 		{
 			0x66, 0x45, 0x8B, 0x3F,   // mov r15w, word ptr [r15]
 			CONTEXT_COLLISION_CHECK
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -358,7 +363,7 @@ public:
 		{
 			0x45, 0x8A, 0x3F,   // mov r15b, byte ptr [r15]
 			CONTEXT_COLLISION_CHECK
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -377,7 +382,7 @@ public:
 			0x49, 0x8B, 0x1F,                     // mov rbx, qword ptr [r15]
 			0x49, 0x83, 0xC7, 0x08,               // add r15, 0x08
 			0x48, 0x89, 0x1C, 0xC4,               // mov qword ptr [rsp+rax*8], rbx
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -395,7 +400,7 @@ public:
 			0x41, 0x8B, 0x1F,                     // mov ebx, dword ptr [r15]
 			0x49, 0x83, 0xC7, 0x04,               // add r15, 0x04
 			0x89, 0x1C, 0xC4,                     // mov dword ptr [rsp+rax*8], ebx
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -413,7 +418,7 @@ public:
 			0x66, 0x41, 0x8B, 0x1F,               // mov bx, word ptr [r15]
 			0x49, 0x83, 0xC7, 0x02,               // add r15, 0x02
 			0x66, 0x89, 0x1C, 0xC4,               // mov word ptr [rsp+rax*8], bx
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -431,7 +436,7 @@ public:
 			0x41, 0x8A, 0x1F,                     // mov bl, byte ptr [r15]
 			0x49, 0x83, 0xC7, 0x01,               // add r15, 0x01
 			0x88, 0x1C, 0xC4,                     // mov byte ptr [rsp+rax*8], bl
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -449,7 +454,7 @@ public:
 			0x49, 0x83, 0xC5, 0x08,   // add r13, 0x08
 			0x49, 0x83, 0xEF, 0x08,   // sub r15, 0x08
 			0x49, 0x89, 0x07,         // mov qword ptr [r15], rax
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -466,7 +471,7 @@ public:
 			0x49, 0x83, 0xC5, 0x04,   // add r13, 0x04
 			0x49, 0x83, 0xEF, 0x04,   // sub r15, 0x04
 			0x41, 0x89, 0x07,         // mov dword ptr [r15], eax
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -483,7 +488,7 @@ public:
 			0x49, 0x83, 0xC5, 0x02,         // add r13, 0x02
 			0x49, 0x83, 0xEF, 0x02,         // sub r15, 0x02
 			0x66, 0x41, 0x89, 0x07,         // mov word ptr [r15], ax
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -500,7 +505,7 @@ public:
 			0x49, 0x83, 0xC5, 0x01,   // add r13, 0x01
 			0x49, 0x83, 0xEF, 0x01,   // sub r15, 0x01
 			0x41, 0x88, 0x07,         // mov byte ptr [r15], al
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -516,7 +521,7 @@ public:
 			0x49, 0x8B, 0x07,   // mov rax, qword ptr [r15]
 			0x48, 0x8B, 0x00,   // mov rax, qword ptr [rax]
 			0x49, 0x89, 0x07,   // mov qword ptr [r15], rax
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -532,7 +537,7 @@ public:
 			0x8B, 0x00,               // mov eax, dword ptr [rax]
 			0x49, 0x83, 0xC7, 0x04,   // add r15, 0x04
 			0x41, 0x89, 0x07,         // mov dword ptr [r15], eax
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -548,7 +553,7 @@ public:
 			0x66, 0x8B, 0x00,         // mov ax, word ptr [rax]
 			0x49, 0x83, 0xC7, 0x06,   // add r15, 0x06
 			0x66, 0x41, 0x89, 0x07,   // mov word ptr [r15], ax
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -564,7 +569,7 @@ public:
 			0x8A, 0x00,               // mov al, byte ptr [rax]
 			0x49, 0x83, 0xC7, 0x07,   // add r15, 0x07
 			0x41, 0x88, 0x07,         // mov byte ptr [r15], al
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -581,7 +586,7 @@ public:
 			0x49, 0x8B, 0x5F, 0x08,   // mov rbx, qword ptr [r15+0x08]
 			0x49, 0x83, 0xC7, 0x10,   // add r15, 0x10
 			0x48, 0x89, 0x18,         // mov qword ptr [rax], rbx
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -597,7 +602,7 @@ public:
 			0x41, 0x8B, 0x5F, 0x08,   // mov ebx, dword ptr [r15+0x08]
 			0x49, 0x83, 0xC7, 0x0C,   // add r15, 0x0C
 			0x89, 0x18,               // mov dword ptr [rax], ebx
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -613,7 +618,7 @@ public:
 			0x66, 0x41, 0x8B, 0x5F, 0x08,   // mov bx, word ptr [r15+0x08]
 			0x49, 0x83, 0xC7, 0x0A,         // add r15, 0x0A
 			0x66, 0x89, 0x18,               // mov word ptr [rax], bx
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -629,7 +634,7 @@ public:
 			0x41, 0x8A, 0x5F, 0x08,   // mov bl, byte ptr [r15+0x08]
 			0x49, 0x83, 0xC7, 0x09,   // add r15, 0x9
 			0x88, 0x18,               // mov byte ptr [rax], bl
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -646,7 +651,7 @@ public:
 			0x49, 0x01, 0x47, 0x08,   // add qword ptr [r15+0x08], rax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -663,7 +668,7 @@ public:
 			0x41, 0x01, 0x47, 0x08,   // add dword ptr [r15+0x08], eax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -680,7 +685,7 @@ public:
 			0x66, 0x41, 0x01, 0x47, 0x08,   // add word ptr [r15+0x08], ax
 			0x9C,                           // pushfq
 			0x41, 0x8F, 0x07,               // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -697,7 +702,7 @@ public:
 			0x41, 0x00, 0x47, 0x08,   // add byte ptr [r15+0x08], al
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -714,7 +719,7 @@ public:
 			0x49, 0x29, 0x47, 0x08,   // sub qword ptr [r15+0x08], rax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -731,7 +736,7 @@ public:
 			0x41, 0x29, 0x47, 0x08,   // sub dword ptr [r15+0x08], eax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -748,7 +753,7 @@ public:
 			0x66, 0x41, 0x29, 0x47, 0x08,   // sub word ptr [r15+0x08], ax
 			0x9C,                           // pushfq
 			0x41, 0x8F, 0x07,               // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -765,7 +770,7 @@ public:
 			0x41, 0x28, 0x47, 0x08,   // sub byte ptr [r15+0x08], al
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -782,7 +787,7 @@ public:
 			0x49, 0x31, 0x47, 0x08,   // xor qword ptr [r15+0x08], rax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -799,7 +804,7 @@ public:
 			0x41, 0x31, 0x47, 0x08,   // xor dword ptr [r15+0x08], eax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -816,7 +821,7 @@ public:
 			0x66, 0x41, 0x31, 0x47, 0x08,   // xor word ptr [r15+0x08], ax
 			0x9C,                           // pushfq
 			0x41, 0x8F, 0x07,               // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -833,7 +838,7 @@ public:
 			0x41, 0x30, 0x47, 0x08,   // xor byte ptr [r15+0x08], al
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -850,7 +855,7 @@ public:
 			0x49, 0x21, 0x47, 0x08,   // and qword ptr [r15+0x08], rax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -867,7 +872,7 @@ public:
 			0x41, 0x21, 0x47, 0x08,   // and dword ptr [r15+0x08], eax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -884,7 +889,7 @@ public:
 			0x66, 0x41, 0x21, 0x47, 0x08,   // and word ptr [r15+0x08], ax
 			0x9C,                           // pushfq
 			0x41, 0x8F, 0x07,               // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -901,7 +906,7 @@ public:
 			0x41, 0x20, 0x47, 0x08,   // and byte ptr [r15+0x08], al
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -918,7 +923,7 @@ public:
 			0x49, 0x09, 0x47, 0x08,   // or qword ptr [r15+0x08], rax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -935,7 +940,7 @@ public:
 			0x41, 0x09, 0x47, 0x08,   // or dword ptr [r15+0x08], eax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -952,7 +957,7 @@ public:
 			0x66, 0x41, 0x09, 0x47, 0x08,   // or word ptr [r15+0x08], ax
 			0x9C,                           // pushfq
 			0x41, 0x8F, 0x07,               // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -969,7 +974,7 @@ public:
 			0x41, 0x08, 0x47, 0x08,   // or byte ptr [r15+0x08], al
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -989,7 +994,7 @@ public:
 			0x49, 0x89, 0x47, 0x08,   // mov qword ptr [r15+0x08], rax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -1009,7 +1014,7 @@ public:
 			0x41, 0x89, 0x47, 0x08,   // mov qword ptr [r15+0x08], eax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -1029,7 +1034,7 @@ public:
 			0x66, 0x41, 0x89, 0x47, 0x08,   // mov qword ptr [r15+0x08], ax
 			0x9C,                           // pushfq
 			0x41, 0x8F, 0x07,               // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -1049,7 +1054,7 @@ public:
 			0x41, 0x88, 0x47, 0x08,   // mov qword ptr [r15+0x08], al
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -1069,7 +1074,7 @@ public:
 			0x49, 0x89, 0x47, 0x08,   // mov qword ptr [r15+0x08], rax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -1089,7 +1094,7 @@ public:
 			0x41, 0x89, 0x47, 0x08,   // mov qword ptr [r15+0x08], eax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -1109,7 +1114,7 @@ public:
 			0x66, 0x41, 0x89, 0x47, 0x08,   // mov qword ptr [r15+0x08], ax
 			0x9C,                           // pushfq
 			0x41, 0x8F, 0x07,               // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -1129,7 +1134,7 @@ public:
 			0x41, 0x88, 0x47, 0x08,   // mov qword ptr [r15+0x08], al
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -1149,7 +1154,7 @@ public:
 			0x49, 0x89, 0x47, 0x08,   // mov qword ptr [r15+0x08], rax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -1168,7 +1173,7 @@ public:
 			0x41, 0x89, 0x47, 0x08,   // mov dword ptr [r15+0x08], eax
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -1187,7 +1192,7 @@ public:
 			0x66, 0x41, 0x89, 0x47, 0x08,   // mov word ptr [r15+0x08], ax
 			0x9C,                           // pushfq
 			0x41, 0x8F, 0x07,               // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -1206,7 +1211,7 @@ public:
 			0x41, 0x88, 0x47, 0x08,   // mov byte ptr [r15+0x08], al
 			0x9C,                     // pushfq
 			0x41, 0x8F, 0x07,         // pop qword ptr [r15]
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };
@@ -1221,9 +1226,27 @@ public:
 		{
 			0x45, 0x8B, 0x6D, 0x00,   // mov r13d, dword ptr [r13]
 			0x4D, 0x01, 0xF5,         // add r13, r14
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
+};
+
+
+class AntiDbg : public VMHandler
+{
+public:
+    AntiDbg()
+    {
+        type = ANTIDBG;
+        bytes =
+        {
+            0x65, 0x48, 0x8B, 0x04, 0x25, 0x60, 0x00, 0x00, 0x00,
+            0x48, 0x0F, 0xB6, 0x40, 0x02,
+            0x48, 0x85, 0xC0,
+            0x74, 0x13,
+            JMP_TO_NEXT_HANDLER_WITH_DECRYPT
+        };
+    }
 };
 
 class Jne : public VMHandler
@@ -1241,7 +1264,7 @@ public:
 			0x9D,                     // popfq
 			0x4D, 0x8D, 0x7F, 0x08,   // lea r15, qword ptr [r15+0x08]
 			0x4C, 0x0F, 0x45, 0xE8,   // cmovne r13, rax
-			JMP_TO_NEXT_HANDLER
+			JMP_TO_NEXT_HANDLER_WITH_DECRYPT
 		};
 	}
 };

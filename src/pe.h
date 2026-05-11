@@ -18,7 +18,8 @@ public:
 	bool load();
 	bool save(std::string path);
 
-	void addFunctionByRva(DWORD startRva, DWORD endRva);
+	void addFunctionByRva(DWORD startRva, DWORD endRva);	void addFunctionByMarkers();
+	void addAreaByRva(DWORD startRva, DWORD endRva);
 	bool virtualizeFunctions();
 	bool addVmSection();
 

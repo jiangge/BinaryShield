@@ -269,3 +269,61 @@ void PE::removeOriginalFunctionBytes(Function function)
 		0xCC
 	);
 }
+
+void PE::addFunctionByMarkers()
+{
+    // Scan for __BINSHIELD_START / __BINSHIELD_END code markers
+    // Markers: 0xDEADC0DE = START, 0xC0DEDEAD = END
+    const DWORD MARKER_START = 0xDEADC0DE;
+    const DWORD MARKER_END   = 0xC0DEDEAD;
+
+    size_t pos = 0;
+    bool inFunction = false;
+    DWORD startRva = 0;
+
+    while (pos + 4 <= bytes.size()) {
+        DWORD val = *(DWORD*)(bytes.data() + pos);
+        if (!inFunction && val == MARKER_START) {
+            inFunction = true;
+            // Calculate RVA at the code AFTER the marker
+            DWORD fa = 0;
+            for (int i = 0; i < pNtHeader->FileHeader.NumberOfSections; i++) {
+                IMAGE_SECTION_HEADER* s = &pSectionHeader[i];
+                if (pos >= s->PointerToRawData && pos < s->PointerToRawData + s->SizeOfRawData) {
+                    fa = pos - s->PointerToRawData + s->VirtualAddress;
+                    break;
+                }
+            }
+            startRva = fa + 4; // skip marker
+            pos += 4;
+        } else if (inFunction && val == MARKER_END) {
+            inFunction = false;
+            DWORD endRva = 0;
+            for (int i = 0; i < pNtHeader->FileHeader.NumberOfSections; i++) {
+                IMAGE_SECTION_HEADER* s = &pSectionHeader[i];
+                if (pos >= s->PointerToRawData && pos < s->PointerToRawData + s->SizeOfRawData) {
+                    endRva = pos - s->PointerToRawData + s->VirtualAddress;
+                    break;
+                }
+            }
+            if (endRva > startRva) {
+                addAreaByRva(startRva, endRva);
+            }
+            pos += 4;
+        } else {
+            pos++;
+        }
+    }
+}
+
+void PE::addAreaByRva(DWORD startRva, DWORD endRva)
+{
+    DWORD fa = rvaToFileOffset(startRva, pSectionHeader[0].VirtualAddress, pSectionHeader[0].PointerToRawData);
+    DWORD size = endRva - startRva;
+    if (fa + size <= bytes.size()) {
+        Function f(startRva, endRva);
+        f.getBytes().assign(bytes.begin() + fa, bytes.begin() + fa + size);
+        functions.push_back(f);
+    }
+}
+

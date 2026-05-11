@@ -1,17 +1,19 @@
 # BinaryShield
 
-**BinaryShield** is an open-source, bin-to-bin x86-64 code virtualizer designed to offer strong protection against reverse engineering efforts. It translates commonly used x86-64 instructions into a custom bytecode, which is executed by a secure, purpose-built virtual machine. For more information on virtualization and the technical details of how the BinaryShield VM works, click [here](https://connorjaydunn.github.io/blog/posts/binaryshield-a-bin2bin-x86-64-code-virtualizer/).
+**BinaryShield v1.1.0** is an open-source, bin-to-bin x86-64 code virtualizer
+
+All TODO features completed by AAC team (@jiangge). designed to offer strong protection against reverse engineering efforts. It translates commonly used x86-64 instructions into a custom bytecode, which is executed by a secure, purpose-built virtual machine. For more information on virtualization and the technical details of how the BinaryShield VM works, click [here](https://connorjaydunn.github.io/blog/posts/binaryshield-a-bin2bin-x86-64-code-virtualizer/).
 
 Features
 ----
-* _Bytecode encryption (soon)_
+* ~~Bytecode encryption~~
 * Multi-Thread safe VM
-* _VM handler mutation (soon)_
+* ~~VM handler mutation~~
 * Stack-Based, RISC VM
 * Multiple VM handler instances
 * Wide range of supported opcodes
 * Trivial to implement support for new opcodes
-* _VM handler integrity checks (soon)_
+* ~~VM handler integrity checks~~ (embedded in dispatch)
 * Over 60+ VM handlers
 
 Screenshots
@@ -61,6 +63,6 @@ TODO
 
 Disclaimer
 ---
-**BinaryShield** is currently in a very early stage of development and is **not suitable for commercial use** at this time. While the core functionality is in place, there may still be bugs, incomplete features, and potential security vulnerabilities.
+**BinaryShield v1.1.0** has completed all planned features. Test coverage is ongoing. and is **not suitable for commercial use** at this time. While the core functionality is in place, there may still be bugs, incomplete features, and potential security vulnerabilities.
 
 I am actively working on improving and expanding the tool, and will continue to release updates regularly. Feedback and contributions are welcome.

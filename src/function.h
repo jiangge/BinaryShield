@@ -20,9 +20,10 @@ public:
 	std::vector<BYTE> getVirtualInstructionBytes();
 	DWORD getStartRva();
 	DWORD getEndRva();
-private:
+public:
 	DWORD startRva;
 	DWORD endRva;
 	std::vector<BYTE> bytes;
+	std::vector<BYTE>& getBytes() { return bytes; }
 	std::vector<Instruction> instructions;
 };

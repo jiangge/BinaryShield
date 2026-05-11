@@ -23,3 +23,8 @@ DWORD align(DWORD x, DWORD alignment);
 DWORD rvaToFileOffset(DWORD rva, DWORD virtualAddress, DWORD pointerToRawData);
 
 DWORD fileOffsetToRva(DWORD fileOffset, DWORD virtualAddress, DWORD pointerToRawData);
+// Bytecode encryption key (randomized per build via build script)
+extern DWORD g_encryptKey;
+
+std::vector<BYTE> xorEncrypt(const std::vector<BYTE>& data, DWORD key);
+std::vector<BYTE> xorDecrypt(const std::vector<BYTE>& data, DWORD key);
