@@ -120,7 +120,7 @@ DWORD PE::fileOffsetToRva(DWORD offset)
 		if (offset >= pSectionHeader[i].PointerToRawData &&
 			offset < pSectionHeader[i].PointerToRawData + (pSectionHeader[i].SizeOfRawData))
 		{
-			return (offset - pSectionHeader[i].PointerToRawData) + pSectionHeader[i].PointerToRawData;
+			return (offset - pSectionHeader[i].PointerToRawData) + pSectionHeader[i].VirtualAddress;
 		}
 	}
 
@@ -318,9 +318,18 @@ void PE::addFunctionByMarkers()
 
 void PE::addAreaByRva(DWORD startRva, DWORD endRva)
 {
-    DWORD fa = rvaToFileOffset(startRva, pSectionHeader[0].VirtualAddress, pSectionHeader[0].PointerToRawData);
+    // Find the correct section for this RVA range
+    DWORD fa = 0;
+    for (int i = 0; i < pNtHeader->FileHeader.NumberOfSections; i++) {
+        DWORD sectStart = pSectionHeader[i].VirtualAddress;
+        DWORD sectEnd = sectStart + pSectionHeader[i].SizeOfRawData;
+        if (startRva >= sectStart && startRva < sectEnd) {
+            fa = startRva - sectStart + pSectionHeader[i].PointerToRawData;
+            break;
+        }
+    }
     DWORD size = endRva - startRva;
-    if (fa + size <= bytes.size()) {
+    if (fa > 0 && fa + size <= bytes.size() && size >= 5) {
         Function f(startRva, endRva);
         f.getBytes().assign(bytes.begin() + fa, bytes.begin() + fa + size);
         functions.push_back(f);

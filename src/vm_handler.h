@@ -33,7 +33,7 @@ value between rsp & r15 to determine where we will base our vmctx relocation.
 	0x48, 0x89, 0xFC,                                 /* mov rsp, rdi */ \
                                                       /* NO_COLLISION: */
 
-#define JMP_TO_NEXT_HANDLER_WITH_DECRYPT_WITH_DECRYPT \
+#define JMP_TO_NEXT_HANDLER_WITH_DECRYPT \
     0x41, 0x8B, 0x45, 0x00,   /* mov eax, dword ptr [r13] : load encrypted handler RVA */ \
     0x49, 0x83, 0xC5, 0x04,   /* add r13, 0x04 : advance IP */ \
     0x35, 0x9E, 0x37, 0x79, 0xB9,  /* xor eax, 0xB979379E : decrypt with per-build key */ \
@@ -79,7 +79,6 @@ enum VMHandlerTypes
 	JNE,
 
 	ANTIDBG,
-	ENCRYPT_DECRYPT,
 };
 
 class VMHandler
@@ -1240,11 +1239,14 @@ public:
         type = ANTIDBG;
         bytes =
         {
-            0x65, 0x48, 0x8B, 0x04, 0x25, 0x60, 0x00, 0x00, 0x00,
-            0x48, 0x0F, 0xB6, 0x40, 0x02,
-            0x48, 0x85, 0xC0,
-            0x74, 0x13,
-            JMP_TO_NEXT_HANDLER_WITH_DECRYPT
+            // Check PEB.BeingDebugged
+            0x65, 0x48, 0x8B, 0x04, 0x25, 0x60, 0x00, 0x00, 0x00,  // mov rax, gs:[0x60]
+            0x48, 0x0F, 0xB6, 0x40, 0x02,                            // movzx rax, byte [rax+2] ; BeingDebugged
+            0x48, 0x85, 0xC0,                                        // test rax, rax
+            0x75, 0x08,                                               // jnz $+8 ; if debugged, crash
+            JMP_TO_NEXT_HANDLER_WITH_DECRYPT,
+            0x48, 0x31, 0xC0,                                        // xor rax, rax
+            0x48, 0x89, 0x00                                         // mov [rax], rax ; null deref -> crash
         };
     }
 };
